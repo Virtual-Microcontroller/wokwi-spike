@@ -18,7 +18,6 @@ int main(void)
     led_init();
     button_init();
 
-    /* AI-HINT: 文字列リテラルの終わりの " はどこにありますか。21 行目と 22 行目に分かれていますが、これは C では許可されていません */
     uart_puts("Hello from Blue Pill!\n");
 
     int was_pressed = 0;
