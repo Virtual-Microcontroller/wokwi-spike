@@ -1,0 +1,37 @@
+name: Build Hints
+
+# Writes hints INTO the source as /* AI-HINT: ... */ lines and pushes them to
+# the branch, so help is waiting in the editor after a pull.
+#
+# This file is the trigger only; the behaviour lives in build-hints-impl.yml.
+# workflow_run cannot be delegated to another repository -- it must be declared
+# in the repository that reacts to the event -- so the split is forced.
+on:
+  workflow_run:
+    workflows: [build]
+    types: [completed]
+
+# Declared here because a called workflow may reduce permissions but never
+# raise them. The body needs contents: write to push the markers.
+permissions:
+  contents: write
+  actions: read
+
+concurrency:
+  group: hints-${{ github.event.workflow_run.head_sha }}
+  cancel-in-progress: false
+
+jobs:
+  hints:
+    # Three gates before the body is even called:
+    #   the build actually failed;
+    #   assistance has not been switched off for this repository;
+    #   the commit was not made by the bot itself, which is what stops the
+    #     assistant from answering its own push.
+    if: >-
+      github.event.workflow_run.conclusion == 'failure' &&
+      vars.AI_HINTS_ENABLED != 'false' &&
+      github.event.workflow_run.head_commit.author.name != 'github-actions[bot]'
+    uses: ./.github/workflows/build-hints-impl.yml
+    secrets:
+      CLAUDE_CODE_OAUTH_TOKEN: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}

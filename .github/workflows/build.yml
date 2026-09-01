@@ -1,0 +1,124 @@
+name: build
+
+# Compiles the firmware and runs it in the simulator on every push.
+#
+# The simulator is metered: the account that owns WOKWI_CLI_TOKEN has a fixed
+# number of simulation minutes per month, shared by every repository using that
+# token. Every choice below that looks over-careful is protecting that budget.
+on:
+  push:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+# Three pushes in a row should cost one simulation, not three.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+
+      - name: Check sources are UTF-8
+        run: |
+          set -euo pipefail
+
+          # Hints are written into these files in Japanese, so the sources
+          # carry non-ASCII bytes. A Japanese Windows editor that re-saves as
+          # Shift-JIS would mangle them, and -Werror would then turn the
+          # assistant's own help into a build error the author did not cause
+          # and cannot read. Fail here instead, before the compiler, with a
+          # message that says what to do.
+          python3 - <<'PY'
+          import pathlib, subprocess, sys
+
+          # Every tracked file, not a list of extensions. Comments get written
+          # wherever the work is happening, and the non-C files fail worse: a
+          # Shift-JIS byte 0x5C in a Makefile is a line continuation that
+          # swallows the next line, and json.load simply refuses.
+          out = subprocess.run(['git', 'ls-files', '-z'],
+                               capture_output=True, check=True).stdout
+          tracked = [pathlib.Path(p.decode('utf8', 'surrogateescape'))
+                     for p in out.split(b'\0') if p]
+
+          bad, checked = [], 0
+          for path in tracked:
+              if not path.is_file():
+                  continue
+              data = path.read_bytes()
+              # git's own heuristic for "binary": a NUL byte near the start.
+              if b'\0' in data[:8000]:
+                  continue
+              checked += 1
+              try:
+                  data.decode('utf8')
+              except UnicodeDecodeError as e:
+                  bad.append((path, e.start))
+
+          for path, off in bad:
+              print(f'::error file={path}::{path} は UTF-8 ではありません'
+                    f'（{off} バイト目）。UTF-8 で保存し直してください。'
+                    f' / not valid UTF-8 at byte {off}; re-save the file as UTF-8')
+          if bad:
+              print('VS Code: 右下のエンコーディング表示 '
+                    '-> Save with Encoding -> UTF-8')
+              sys.exit(1)
+          print(f'all {checked} tracked text files are valid UTF-8')
+          PY
+
+      # Pinned to the same release installed on the maintainer's machine. A
+      # compiler that differs between the desk and CI produces failures that
+      # only appear after the metered step has already been paid for.
+      - name: Install ARM toolchain
+        uses: carlosperate/arm-none-eabi-gcc-action@98c40e51546516419841748d3210c290df0d2c6c # v1.13.0
+        with:
+          release: '14.2.Rel1'
+
+      # This step is named "Build" on purpose. The hint workflow reads the
+      # conclusion of a step with exactly this name to tell a compile failure,
+      # which is worth explaining, from an infrastructure failure, which is
+      # not. Renaming it silently costs a hint.
+      - name: Build
+        run: make
+
+      # Only reached when the compile succeeded, because a failed step ends the
+      # job. Firmware that does not link is never simulated and therefore never
+      # costs simulation time.
+      #
+      # expect_text ends the simulation the moment the line appears, so a
+      # healthy run costs a fraction of a second rather than the full timeout.
+      # The timeout is what a broken run costs, which is why it is 5 seconds
+      # rather than the action's 10 second default.
+      #
+      # WOKWI_SIM_ENABLED is a repository variable, not a secret. Setting it to
+      # the string false stops every simulation in this repository without
+      # editing a workflow or revoking a token.
+      - name: Simulate
+        if: vars.WOKWI_SIM_ENABLED != 'false'
+        uses: wokwi/wokwi-ci-action@11ddc3fe66a14fcd46683fb21ae5c77657ad4606 # v1.2.0
+        with:
+          token: ${{ secrets.WOKWI_CLI_TOKEN }}
+          path: /
+          timeout: 5000
+          expect_text: 'Hello from Blue Pill!'
+          serial_log_file: 'serial.log'
+
+      # Kept even when the simulation failed: the serial log is the whole
+      # evidence of what the firmware did, and it is what makes a silent
+      # failure diagnosable at all.
+      - name: Upload artifacts
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: firmware
+          path: |
+            app.elf
+            app.hex
+            serial.log
+          if-no-files-found: warn
+          retention-days: 7
