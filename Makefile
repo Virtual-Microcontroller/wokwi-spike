@@ -31,8 +31,16 @@ clean:
 # and spends metered simulation time from the account that owns
 # WOKWI_CLI_TOKEN, so it must never run by reflex or as part of `all`. Build
 # and inspect locally in the editor extension first, which is not metered.
+#
+# No expected string is written here. Every exercise prints something
+# different, so pass one only when an exercise requires exact output:
+#   make sim WOKWI_EXPECT_TEXT="Ready"
+# Without it the run lasts the full timeout and reports whatever was printed.
+WOKWI_TIMEOUT_MS ?= 2000
+
 sim: app.elf
 	@echo "This spends metered simulation time. Ctrl-C now to stop."
-	wokwi-cli --timeout 5000 --expect-text "Hello from Blue Pill!" .
+	wokwi-cli --timeout $(WOKWI_TIMEOUT_MS) \
+	  $(if $(WOKWI_EXPECT_TEXT),--expect-text "$(WOKWI_EXPECT_TEXT)") .
 
 .PHONY: all clean sim

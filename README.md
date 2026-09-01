@@ -68,9 +68,13 @@ Start Simulator.*
 
 - コンパイルが失敗したファームウェアはシミュレータに渡されません。時間を
   消費しません。
-- 期待する文字列が出た瞬間にシミュレーションは終了します。正常なビルドは
-  1 秒未満で済みます。
-- タイムアウトは 5 秒です。壊れたファームウェアの上限がこの値です。
+- 既定では「何か出力があれば合格、無音なら不合格」です。期待する文字列は
+  ワークフローに書き込まれていません。課題ごとに出力が違うため、共通の
+  既定値はほとんどの課題にとって誤りになるからです。
+- この既定では途中で打ち切れないため、毎回タイムアウトまで実行されます。
+  タイムアウトは既定で 2 秒、リポジトリ変数 `WOKWI_TIMEOUT_MS` で変えられます。
+- 正確な文字列が必要な課題では、リポジトリ変数 `WOKWI_EXPECT_TEXT` を
+  設定してください。その文字列が出た瞬間に終了するので 1 秒未満で済みます。
 - 続けて push すると、古い実行は取り消され、1 回分だけが課金されます。
 - リポジトリ変数 `WOKWI_SIM_ENABLED` を `false` にすると、シミュレーションを
   すべて止められます。ワークフローを編集する必要はありません。
@@ -80,10 +84,14 @@ Start Simulator.*
 
 *The CI simulator is **metered**: the account that owns the token has a monthly
 allowance shared by every repository using it. Broken firmware is never
-simulated, a healthy run ends the moment the expected text appears, the timeout
-is 5 seconds, and repeated pushes are billed once. Set the repository variable
-`WOKWI_SIM_ENABLED` to `false` to stop simulating entirely. `make sim` is
-metered too — check in the VS Code extension first.*
+simulated. By default any serial output passes and only silence fails — no
+expected string is written into the workflow, because every exercise prints
+something different. That default cannot stop early, so every run lasts until
+the timeout, which is 2 seconds and set by `WOKWI_TIMEOUT_MS`. An exercise
+needing exact output sets `WOKWI_EXPECT_TEXT` and gets the early exit back.
+Repeated pushes are billed once. Set `WOKWI_SIM_ENABLED` to `false` to stop
+simulating entirely. `make sim` is metered too — check in the VS Code extension
+first.*
 
 ## push する / Push it
 
