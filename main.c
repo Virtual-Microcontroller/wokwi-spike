@@ -18,8 +18,6 @@ int main(void)
     led_init();
     button_init();
 
-    uart_puts("Hello from Blue Pill!\n");
-
     int was_pressed = 0;
 
     for (;;) {

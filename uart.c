@@ -26,7 +26,7 @@
 
 void uart_init(void)
 {
-    RCC_APB2ENR |= RCC_IOPAEN;
+    RCC_APB2ENR |= RCC_IOPAEN | RCC_USART1EN;
 
     /* PA9 carries USART1_TX. CRH holds four configuration bits for each of
        pins 8 to 15, so pin 9 sits at bits 4 to 7. 0xB is alternate-function
