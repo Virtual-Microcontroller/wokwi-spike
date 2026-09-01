@@ -18,6 +18,9 @@ int main(void)
     led_init();
     button_init();
 
+    uart_puts("Hello from Blue Pill!
+");
+
     /* AI-HINT: テストは "Hello from Blue Pill!" を探しています。初期化の後に何を送信する必要がありますか */
     int was_pressed = 0;
 
