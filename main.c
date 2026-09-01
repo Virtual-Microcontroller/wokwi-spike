@@ -18,6 +18,7 @@ int main(void)
     led_init();
     button_init();
 
+    /* AI-HINT: テストは "Hello from Blue Pill!" を探しています。初期化の後に何を送信する必要がありますか */
     int was_pressed = 0;
 
     for (;;) {
