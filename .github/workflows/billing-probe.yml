@@ -1,0 +1,28 @@
+# TEMPORARY. Delete after reading its billing.
+#
+# Question: does a run in a PUBLIC repository bill zero minutes even when it
+# occupies a runner for a meaningful time and does real work? The billing
+# documentation says standard runners are free in public repositories; this
+# is that claim observed rather than read (ADR-0029).
+#
+# Deliberately holds no secret and touches no private repository, so it can
+# be run without placing a credential anywhere.
+name: billing probe
+
+on:
+  workflow_dispatch:
+
+permissions: {}
+
+jobs:
+  occupy-a-runner:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Do some work, and take long enough to be unambiguous
+        run: |
+          python3 - <<'PY'
+          total = sum(i * i for i in range(2_000_000))
+          print("computed", total)
+          PY
+          sleep 90
+          echo "done"
